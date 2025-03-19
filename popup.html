@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>LeetCode Buddy</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        width: 350px;
+        height: 500px;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .header {
+        background-color: #2cbb5d;
+        color: white;
+        padding: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-weight: bold;
+      }
+      .logo-container {
+        display: flex;
+        align-items: center;
+      }
+      .logo {
+        width: 24px;
+        height: 24px;
+        margin-right: 8px;
+      }
+      .status {
+        font-size: 12px;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+        max-width: 150px;
+      }
+      .chat-container {
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px;
+        background-color: #f7f9fc;
+      }
+      .message {
+        margin-bottom: 10px;
+        padding: 8px 12px;
+        border-radius: 10px;
+        max-width: 80%;
+        word-wrap: break-word;
+      }
+      .user-message {
+        background-color: #e1f5fe;
+        margin-left: auto;
+        border-bottom-right-radius: 2px;
+      }
+      .bot-message {
+        background-color: #ffffff;
+        margin-right: auto;
+        border-bottom-left-radius: 2px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      }
+      .code-block {
+        background-color: #f1f3f4;
+        padding: 8px;
+        border-radius: 4px;
+        font-family: monospace;
+        overflow-x: auto;
+        white-space: pre-wrap;
+      }
+      .input-container {
+        display: flex;
+        padding: 10px;
+        background-color: white;
+        border-top: 1px solid #e0e0e0;
+      }
+      #message-input {
+        flex: 1;
+        border: 1px solid #e0e0e0;
+        border-radius: 20px;
+        padding: 8px 12px;
+        outline: none;
+        resize: none;
+        max-height: 100px;
+        min-height: 40px;
+        font-family: Arial, sans-serif;
+      }
+      #send-button {
+        background-color: #2cbb5d;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        margin-left: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #send-button:hover {
+        background-color: #239d4d;
+      }
+      #send-button:disabled {
+        background-color: #cccccc;
+        cursor: not-allowed;
+      }
+      .spinner {
+        display: none;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s ease-in-out infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .initial-message {
+        text-align: center;
+        color: #666;
+        margin: 20px;
+      }
+      .problem-info {
+        font-size: 12px;
+        background-color: #edf0f7;
+        padding: 8px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+      }
+      .problem-title {
+        font-weight: bold;
+      }
+      .api-key-container {
+        padding: 20px;
+        text-align: center;
+        display: none;
+      }
+      .api-key-container input {
+        width: 90%;
+        padding: 8px;
+        margin-bottom: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      .api-key-container button {
+        background-color: #2cbb5d;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <div class="logo-container">
+        <img src="images/icon48.png" alt="Logo" class="logo" />
+        <span>LeetCode Buddy</span>
+      </div>
+      <span class="status" id="status">Not connected</span>
+    </div>
+
+    <div id="api-key-setup" class="api-key-container">
+      <h3>Set up your Gemini API Key</h3>
+      <p>
+        Enter your Google Gemini API key to start using LeetCode Buddy with
+        Gemini 1.5 Flash
+      </p>
+      <input type="password" id="api-key-input" placeholder="Enter API Key" />
+      <button id="save-api-key">Save API Key</button>
+    </div>
+
+    <div
+      id="chat-interface"
+      style="display: none; flex: 1; display: flex; flex-direction: column"
+    >
+      <div class="problem-info" id="problem-info">
+        <div class="problem-title" id="problem-title">Loading problem...</div>
+        <div id="problem-difficulty"></div>
+      </div>
+
+      <div class="chat-container" id="chat-container">
+        <div class="initial-message">
+          Ask questions about the current LeetCode problem
+        </div>
+      </div>
+
+      <div class="input-container">
+        <textarea
+          id="message-input"
+          placeholder="Ask something about this problem..."
+        ></textarea>
+        <button id="send-button">
+          <div class="spinner" id="spinner"></div>
+          <span id="send-icon">➤</span>
+        </button>
+      </div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

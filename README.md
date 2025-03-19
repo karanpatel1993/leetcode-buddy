@@ -81,7 +81,3 @@ If you encounter issues:
 4. Try refreshing the page or reinstalling the extension
 5. If you get API-related errors, make sure your API key is valid and has not exceeded usage limits
 6. For model-specific errors, check that the "gemini-1.5-flash" model is available in your API tier
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.

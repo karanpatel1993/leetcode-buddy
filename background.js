@@ -148,12 +148,33 @@ function constructPrompt(message, problemContext, userCode, chatHistory = []) {
   const problemContextStr = problemContext || "(No problem context available)";
   const userCodeStr = userCode || "(No user code available)";
 
+  // Extract problem name from context if possible
+  let problemName = "Unknown";
+  let problemLink = "https://leetcode.com/problems/";
+
+  try {
+    // Attempt to extract the problem name from the context
+    const titleMatch = problemContextStr.match(/\b(\d+)\.\s+([A-Za-z0-9\s-]+)/);
+    if (titleMatch && titleMatch[2]) {
+      problemName = titleMatch[2].trim();
+      // Convert problem name to URL format
+      const problemSlug = problemName.toLowerCase().replace(/\s+/g, "-");
+      problemLink = `https://leetcode.com/problems/${problemSlug}/`;
+    }
+  } catch (e) {
+    console.error("Error extracting problem name:", e);
+  }
+
   return (
     "You are an expert programming assistant with deep knowledge of algorithms, data structures, and problem-solving techniques for coding interviews.\n\n" +
     "CONTEXT:\n" +
     "- The user is working on a LeetCode problem\n" +
     "- You need to provide helpful guidance and feedback on their code\n" +
     "- Your goal is to help them understand the solution and improve their coding skills\n\n" +
+    "PROBLEM REFERENCE:\n" +
+    `- Problem: ${problemName}\n` +
+    `- Link: ${problemLink}\n` +
+    "- Always check the exact problem statement and constraints at the link above before analyzing\n\n" +
     "PROBLEM DESCRIPTION:\n" +
     "```\n" +
     problemContextStr +
@@ -166,17 +187,18 @@ function constructPrompt(message, problemContext, userCode, chatHistory = []) {
     'USER QUERY: "' +
     message +
     '"\n\n' +
-    "RESPONSE GUIDELINES:\n" +
-    "1. First, understand the problem statement completely\n" +
-    "2. Analyze the user's code with extreme accuracy by tracing through multiple examples including edge cases\n" +
-    "3. Pay special attention to these common issues:\n" +
+    "ANALYSIS STEPS:\n" +
+    "1. First, understand the problem statement completely by reviewing the description\n" +
+    "2. Identify the problem type and relevant algorithms/data structures\n" +
+    "3. Analyze the user's code with extreme accuracy by tracing through multiple examples including edge cases\n" +
+    "4. Pay special attention to these common issues:\n" +
     "   - Stack problems: Check if all push/pop operations are correct AND verify final stack emptiness check\n" +
     "   - Array/string problems: Verify index boundaries and off-by-one errors\n" +
     "   - Recursive solutions: Ensure proper base cases and recursion depth\n" +
     "   - Tree/graph problems: Confirm complete traversal and correct node processing\n" +
-    "4. If you find issues, explain them with specific examples showing incorrect behavior\n" +
-    "5. If the code has a bug, provide clear guidance on how to fix it (not just what's wrong)\n" +
-    "6. Always validate your analysis by double-checking your reasoning\n\n" +
+    "5. If you find issues, explain them with specific examples showing incorrect behavior\n" +
+    "6. If the code has a bug, provide clear guidance on how to fix it (not just what's wrong)\n" +
+    "7. Always validate your analysis by double-checking your reasoning\n\n" +
     "IMPORTANT NOTES:\n" +
     "- Be precise about identifying bugs - provide concrete examples\n" +
     "- For the Valid Parentheses problem specifically, ensure the code checks if the stack is empty at the end\n" +

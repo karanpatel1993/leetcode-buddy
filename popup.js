@@ -19,6 +19,10 @@ document.addEventListener("DOMContentLoaded", () => {
   let retryCount = 0;
   const MAX_RETRIES = 3;
 
+  // Track current problem
+  let currentProblemTitle = null;
+  let lastProblemTitle = null;
+
   // Keep track of current response element and streaming state
   let currentResponseElement = null;
   let waitingForResponse = false;
@@ -29,25 +33,33 @@ document.addEventListener("DOMContentLoaded", () => {
   let chatHistory = [];
 
   // Check if API key is set
-  chrome.storage.local.get(["geminiApiKey", "chatHistory"], (result) => {
-    if (result.geminiApiKey) {
-      apiKeyContainer.style.display = "none";
-      chatInterface.style.display = "flex";
+  chrome.storage.local.get(
+    ["geminiApiKey", "chatHistory", "lastProblemTitle"],
+    (result) => {
+      if (result.geminiApiKey) {
+        apiKeyContainer.style.display = "none";
+        chatInterface.style.display = "flex";
 
-      // Load chat history if available
-      if (result.chatHistory && Array.isArray(result.chatHistory)) {
-        chatHistory = result.chatHistory;
+        // Store last problem title if it exists
+        if (result.lastProblemTitle) {
+          lastProblemTitle = result.lastProblemTitle;
+        }
 
-        // Render chat history in the UI
-        renderChatHistory();
+        // Load chat history if available
+        if (result.chatHistory && Array.isArray(result.chatHistory)) {
+          chatHistory = result.chatHistory;
+
+          // Render chat history in the UI
+          renderChatHistory();
+        }
+
+        checkIfOnLeetCode();
+      } else {
+        apiKeyContainer.style.display = "block";
+        chatInterface.style.display = "none";
       }
-
-      checkIfOnLeetCode();
-    } else {
-      apiKeyContainer.style.display = "block";
-      chatInterface.style.display = "none";
     }
-  });
+  );
 
   // Render stored chat history
   function renderChatHistory() {
@@ -313,7 +325,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function updateProblemInfo(response) {
     if (response.title) {
+      currentProblemTitle = response.title;
       problemTitleElement.textContent = response.title;
+
+      // Check if problem has changed
+      if (lastProblemTitle && lastProblemTitle !== currentProblemTitle) {
+        // Problem has changed, show notification to clear chat
+        showProblemChangeNotification();
+      } else {
+        // Update the stored problem title
+        chrome.storage.local.set({ lastProblemTitle: currentProblemTitle });
+      }
     }
 
     if (response.difficulty) {
@@ -337,6 +359,157 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       problemDifficultyElement.style.display = "none";
     }
+  }
+
+  // Function to show problem change notification with clear option
+  function showProblemChangeNotification() {
+    // Create notification container
+    const notificationContainer = document.createElement("div");
+    notificationContainer.className = "problem-change-notification";
+    notificationContainer.style.backgroundColor = "#f9f2d6";
+    notificationContainer.style.borderRadius = "8px";
+    notificationContainer.style.padding = "12px";
+    notificationContainer.style.margin = "0 0 12px 0";
+    notificationContainer.style.display = "flex";
+    notificationContainer.style.alignItems = "center";
+    notificationContainer.style.justifyContent = "space-between";
+    notificationContainer.style.boxShadow = "0 2px 4px rgba(0,0,0,0.1)";
+    notificationContainer.style.animation = "fadeIn 0.3s ease-in-out";
+
+    // Add notification text
+    const notificationText = document.createElement("div");
+    notificationText.textContent = "New problem detected. Clear chat history?";
+    notificationText.style.fontSize = "13px";
+    notificationText.style.color = "#5f5021";
+    notificationText.style.flexGrow = "1";
+
+    // Button container
+    const buttonContainer = document.createElement("div");
+    buttonContainer.style.display = "flex";
+    buttonContainer.style.alignItems = "center";
+    buttonContainer.style.gap = "8px"; // Use gap for consistent spacing
+    buttonContainer.style.marginLeft = "16px"; // Space between text and buttons
+
+    // Add clear button
+    const clearButton = document.createElement("button");
+    clearButton.textContent = "Clear";
+    clearButton.style.backgroundColor = "#4CAF50";
+    clearButton.style.color = "white";
+    clearButton.style.border = "none";
+    clearButton.style.borderRadius = "4px";
+    clearButton.style.padding = "6px 12px";
+    clearButton.style.cursor = "pointer";
+    clearButton.style.fontSize = "12px";
+    clearButton.style.minWidth = "60px"; // Ensure consistent width
+    clearButton.style.fontWeight = "500";
+
+    // Add dismiss button
+    const dismissButton = document.createElement("button");
+    dismissButton.textContent = "Keep";
+    dismissButton.style.backgroundColor = "#9e9e9e";
+    dismissButton.style.color = "white";
+    dismissButton.style.border = "none";
+    dismissButton.style.borderRadius = "4px";
+    dismissButton.style.padding = "6px 12px";
+    dismissButton.style.cursor = "pointer";
+    dismissButton.style.fontSize = "12px";
+    dismissButton.style.minWidth = "60px"; // Ensure consistent width
+    dismissButton.style.fontWeight = "500";
+
+    // Add event listener for clear button
+    clearButton.addEventListener("click", () => {
+      clearChatHistory();
+      chatContainer.removeChild(notificationContainer);
+    });
+
+    // Add event listener for dismiss button
+    dismissButton.addEventListener("click", () => {
+      chatContainer.removeChild(notificationContainer);
+      // Update lastProblemTitle to current problem
+      chrome.storage.local.set({ lastProblemTitle: currentProblemTitle });
+    });
+
+    // Add hover effect for buttons
+    const addHoverEffect = (button) => {
+      button.style.transition = "background-color 0.2s ease";
+      button.addEventListener("mouseover", () => {
+        button.style.backgroundColor =
+          button === clearButton ? "#45a049" : "#8e8e8e";
+      });
+      button.addEventListener("mouseout", () => {
+        button.style.backgroundColor =
+          button === clearButton ? "#4CAF50" : "#9e9e9e";
+      });
+    };
+
+    addHoverEffect(clearButton);
+    addHoverEffect(dismissButton);
+
+    // Assemble the notification
+    buttonContainer.appendChild(clearButton);
+    buttonContainer.appendChild(dismissButton);
+    notificationContainer.appendChild(notificationText);
+    notificationContainer.appendChild(buttonContainer);
+
+    // Add to the top of chat container
+    if (chatContainer.firstChild) {
+      chatContainer.insertBefore(
+        notificationContainer,
+        chatContainer.firstChild
+      );
+    } else {
+      chatContainer.appendChild(notificationContainer);
+    }
+
+    // Add animation style
+    const style = document.createElement("style");
+    style.textContent = `
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // Clear chat history function
+  function clearChatHistory() {
+    // Clear chat history
+    chatHistory = [];
+    chrome.storage.local.set({
+      chatHistory: [],
+      lastProblemTitle: currentProblemTitle,
+    });
+
+    // Clear chat UI
+    chatContainer.innerHTML = "";
+
+    // Add confirmation message
+    const confirmationElement = document.createElement("div");
+    confirmationElement.textContent = "Chat history cleared";
+    confirmationElement.style.textAlign = "center";
+    confirmationElement.style.padding = "10px";
+    confirmationElement.style.color = "#888";
+    confirmationElement.style.fontSize = "12px";
+    confirmationElement.style.opacity = "0";
+    confirmationElement.style.transition = "opacity 0.3s ease";
+
+    chatContainer.appendChild(confirmationElement);
+
+    // Fade in the confirmation message
+    setTimeout(() => {
+      confirmationElement.style.opacity = "1";
+    }, 10);
+
+    // Fade out and remove after 3 seconds
+    setTimeout(() => {
+      confirmationElement.style.opacity = "0";
+      setTimeout(() => {
+        if (confirmationElement.parentNode) {
+          confirmationElement.parentNode.removeChild(confirmationElement);
+        }
+      }, 300);
+    }, 3000);
   }
 
   // Send message to Gemini
@@ -837,39 +1010,7 @@ document.addEventListener("DOMContentLoaded", () => {
   clearHistoryButton.style.top = "10px";
 
   clearHistoryButton.addEventListener("click", () => {
-    // Clear chat history
-    chatHistory = [];
-    chrome.storage.local.set({ chatHistory });
-
-    // Clear chat UI
-    chatContainer.innerHTML = "";
-
-    // Add confirmation message
-    const confirmationElement = document.createElement("div");
-    confirmationElement.textContent = "Chat history cleared";
-    confirmationElement.style.textAlign = "center";
-    confirmationElement.style.padding = "10px";
-    confirmationElement.style.color = "#888";
-    confirmationElement.style.fontSize = "12px";
-    confirmationElement.style.opacity = "0";
-    confirmationElement.style.transition = "opacity 0.3s ease";
-
-    chatContainer.appendChild(confirmationElement);
-
-    // Fade in the confirmation message
-    setTimeout(() => {
-      confirmationElement.style.opacity = "1";
-    }, 10);
-
-    // Fade out and remove after 3 seconds
-    setTimeout(() => {
-      confirmationElement.style.opacity = "0";
-      setTimeout(() => {
-        if (confirmationElement.parentNode) {
-          confirmationElement.parentNode.removeChild(confirmationElement);
-        }
-      }, 300);
-    }, 3000);
+    clearChatHistory();
   });
 
   // Add the clear history button to the UI

@@ -36,17 +36,19 @@
         color: white;
         padding: 16px;
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         justify-content: space-between;
         font-weight: 500;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
         position: relative;
         z-index: 10;
+        min-height: 80px; /* Ensure enough height for stacked elements */
       }
 
       .logo-container {
         display: flex;
         align-items: center;
+        padding-top: 4px;
       }
 
       .logo {
@@ -61,13 +63,16 @@
         white-space: nowrap;
         text-overflow: ellipsis;
         overflow: hidden;
-        max-width: 160px;
+        min-width: auto;
+        max-width: 180px;
         padding: 4px 10px;
         border-radius: 12px;
         background-color: rgba(255, 255, 255, 0.2);
-        display: flex;
+        display: inline-flex;
         align-items: center;
         transition: all 0.3s ease;
+        margin-right: 0;
+        align-self: flex-start;
       }
 
       .status-icon {
@@ -467,6 +472,40 @@
           content: "";
         }
       }
+
+      /* Create a dedicated container for the top toolbar */
+      .header-toolbar {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        position: relative;
+        margin-left: auto;
+        gap: 8px; /* Add spacing between items */
+      }
+
+      .header-button,
+      .retry-button {
+        margin-top: 0; /* Remove top margin since we're using gap */
+        z-index: 20;
+        padding: 4px 10px;
+        background-color: rgba(255, 255, 255, 0.2);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        font-size: 12px;
+        display: inline-flex;
+        align-items: center;
+        transition: background-color 0.2s ease;
+      }
+
+      .retry-button {
+        background-color: #2cbb5d;
+        border-radius: 4px;
+        display: inline-flex;
+        align-self: flex-start;
+        margin-top: 0;
+      }
     </style>
   </head>
   <body>
@@ -475,9 +514,11 @@
         <img src="images/icon48.png" alt="Logo" class="logo" />
         <span>LeetCode Buddy</span>
       </div>
-      <div id="status" class="status">
-        <span class="material-icons status-icon">fiber_manual_record</span>
-        <span id="status-text">Initializing</span>
+      <div class="header-toolbar">
+        <div id="status" class="status">
+          <span class="material-icons status-icon">fiber_manual_record</span>
+          <span id="status-text">Initializing</span>
+        </div>
       </div>
     </div>
 

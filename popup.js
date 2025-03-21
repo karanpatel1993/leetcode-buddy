@@ -51,6 +51,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
           // Render chat history in the UI
           renderChatHistory();
+
+          // Update clear chat button visibility
+          setTimeout(() => updateClearChatButtonVisibility(), 100);
         }
 
         checkIfOnLeetCode();
@@ -115,26 +118,35 @@ document.addEventListener("DOMContentLoaded", () => {
   saveApiKeyButton.addEventListener("click", () => {
     const apiKey = apiKeyInput.value.trim();
     if (apiKey) {
-      saveApiKeyButton.textContent = "Saving...";
+      const isUpdate = saveApiKeyButton.textContent === "Update Key";
+      saveApiKeyButton.textContent = isUpdate ? "Updating..." : "Saving...";
       saveApiKeyButton.disabled = true;
 
       chrome.storage.local.set({ geminiApiKey: apiKey }, () => {
-        // Add animation for smooth transition
-        apiKeyContainer.style.opacity = "0";
-        apiKeyContainer.style.transform = "scale(0.95)";
-        apiKeyContainer.style.transition = "all 0.3s ease";
-
-        setTimeout(() => {
-          apiKeyContainer.style.display = "none";
-          chatInterface.style.display = "flex";
-          chatInterface.style.opacity = "0";
+        if (isUpdate) {
+          // If updating, just go back to chat
+          hideApiKeyForm();
+          // Show confirmation toast
+          showToast("API key updated successfully!");
+        } else {
+          // Initial setup, transition to chat interface
+          // Add animation for smooth transition
+          apiKeyContainer.style.opacity = "0";
+          apiKeyContainer.style.transform = "scale(0.95)";
+          apiKeyContainer.style.transition = "all 0.3s ease";
 
           setTimeout(() => {
-            chatInterface.style.opacity = "1";
-            chatInterface.style.transition = "opacity 0.3s ease";
-            checkIfOnLeetCode();
-          }, 50);
-        }, 300);
+            apiKeyContainer.style.display = "none";
+            chatInterface.style.display = "flex";
+            chatInterface.style.opacity = "0";
+
+            setTimeout(() => {
+              chatInterface.style.opacity = "1";
+              chatInterface.style.transition = "opacity 0.3s ease";
+              checkIfOnLeetCode();
+            }, 50);
+          }, 300);
+        }
       });
     } else {
       // Animate the input to indicate error
@@ -146,6 +158,41 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 800);
     }
   });
+
+  // Function to show toast notification
+  function showToast(message) {
+    const toast = document.createElement("div");
+    toast.textContent = message;
+    toast.style.position = "fixed";
+    toast.style.bottom = "20px";
+    toast.style.left = "50%";
+    toast.style.transform = "translateX(-50%)";
+    toast.style.backgroundColor = "#4CAF50";
+    toast.style.color = "white";
+    toast.style.padding = "10px 20px";
+    toast.style.borderRadius = "4px";
+    toast.style.boxShadow = "0 2px 8px rgba(0,0,0,0.2)";
+    toast.style.zIndex = "1000";
+    toast.style.opacity = "0";
+    toast.style.transition = "opacity 0.3s ease";
+
+    document.body.appendChild(toast);
+
+    // Fade in
+    setTimeout(() => {
+      toast.style.opacity = "1";
+    }, 10);
+
+    // Fade out and remove after 3 seconds
+    setTimeout(() => {
+      toast.style.opacity = "0";
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+        }
+      }, 300);
+    }, 3000);
+  }
 
   // Check if we're on a LeetCode problem page
   function checkIfOnLeetCode() {
@@ -186,6 +233,8 @@ document.addEventListener("DOMContentLoaded", () => {
       statusElement.querySelector(".status-icon").style.color = "#e0e0e0";
       statusTextElement.classList.remove("loading-dots");
     }
+
+    // No need for positioning styles as it's now handled by CSS
   }
 
   function getProblemContext(tabId) {
@@ -292,7 +341,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const retryButton = document.createElement("button");
       retryButton.textContent = "Retry";
       retryButton.className = "retry-button";
-      retryButton.style.marginLeft = "8px";
       retryButton.style.padding = "4px 10px";
       retryButton.style.backgroundColor = "#2cbb5d";
       retryButton.style.color = "white";
@@ -301,8 +349,10 @@ document.addEventListener("DOMContentLoaded", () => {
       retryButton.style.cursor = "pointer";
 
       retryButton.addEventListener("click", () => {
-        if (statusTextElement.nextElementSibling === retryButton) {
-          statusElement.removeChild(retryButton);
+        // Remove the retry button from the toolbar
+        const headerToolbar = document.querySelector(".header-toolbar");
+        if (headerToolbar.contains(retryButton)) {
+          headerToolbar.removeChild(retryButton);
         }
         updateStatus("Retrying...", "loading");
 
@@ -314,11 +364,10 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       // If a retry button already exists, don't add another one
-      if (
-        !statusTextElement.nextElementSibling ||
-        !statusTextElement.nextElementSibling.classList.contains("retry-button")
-      ) {
-        statusElement.appendChild(retryButton);
+      const headerToolbar = document.querySelector(".header-toolbar");
+      const existingRetryButton = headerToolbar.querySelector(".retry-button");
+      if (!existingRetryButton) {
+        headerToolbar.appendChild(retryButton);
       }
     }
   }
@@ -363,6 +412,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Function to show problem change notification with clear option
   function showProblemChangeNotification() {
+    // Only show notification if there's chat history to clear
+    if (!chatHistory || chatHistory.length === 0) {
+      // Just update the lastProblemTitle without showing notification
+      chrome.storage.local.set({ lastProblemTitle: currentProblemTitle });
+      return;
+    }
+
     // Create notification container
     const notificationContainer = document.createElement("div");
     notificationContainer.className = "problem-change-notification";
@@ -474,6 +530,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Clear chat history function
   function clearChatHistory() {
+    // Check if chat history is already empty
+    if (!chatHistory || chatHistory.length === 0) {
+      return; // Don't show confirmation if already empty
+    }
+
     // Clear chat history
     chatHistory = [];
     chrome.storage.local.set({
@@ -510,6 +571,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }, 300);
     }, 3000);
+
+    // Update button visibility
+    updateClearChatButtonVisibility();
   }
 
   // Send message to Gemini
@@ -542,6 +606,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Save chat history to storage
         chrome.storage.local.set({ chatHistory });
+
+        // Update clear chat button visibility
+        updateClearChatButtonVisibility();
 
         // Send request to background script
         chrome.runtime.sendMessage(
@@ -927,6 +994,9 @@ document.addEventListener("DOMContentLoaded", () => {
         chatContainer.scrollTop = chatContainer.scrollHeight;
       }, 100);
 
+      // Update clear chat button visibility when messages are added
+      updateClearChatButtonVisibility();
+
       return messageElement;
     }
   }
@@ -994,25 +1064,163 @@ document.addEventListener("DOMContentLoaded", () => {
   // Focus input field on load
   messageInput.focus();
 
-  // Add a new button to clear chat history
-  const clearHistoryButton = document.createElement("button");
-  clearHistoryButton.textContent = "Clear History";
-  clearHistoryButton.className = "clear-history-button";
-  clearHistoryButton.style.marginLeft = "8px";
-  clearHistoryButton.style.padding = "4px 10px";
-  clearHistoryButton.style.backgroundColor = "#ff5252";
-  clearHistoryButton.style.color = "white";
-  clearHistoryButton.style.border = "none";
-  clearHistoryButton.style.borderRadius = "4px";
-  clearHistoryButton.style.cursor = "pointer";
-  clearHistoryButton.style.position = "absolute";
-  clearHistoryButton.style.right = "10px";
-  clearHistoryButton.style.top = "10px";
+  // Create a button container in the header for the API key button
+  const headerApiKeyButton = document.createElement("button");
+  headerApiKeyButton.textContent = "API Key";
+  headerApiKeyButton.className = "header-button";
+  headerApiKeyButton.title = "Update API Key";
 
-  clearHistoryButton.addEventListener("click", () => {
-    clearChatHistory();
+  // Add key icon
+  const keyIcon = document.createElement("span");
+  keyIcon.className = "material-icons";
+  keyIcon.style.fontSize = "14px";
+  keyIcon.style.marginRight = "4px";
+  keyIcon.textContent = "vpn_key";
+  headerApiKeyButton.insertBefore(keyIcon, headerApiKeyButton.firstChild);
+
+  // Add hover effect
+  headerApiKeyButton.addEventListener("mouseover", () => {
+    headerApiKeyButton.style.backgroundColor = "rgba(255, 255, 255, 0.3)";
+  });
+  headerApiKeyButton.addEventListener("mouseout", () => {
+    headerApiKeyButton.style.backgroundColor = "rgba(255, 255, 255, 0.2)";
   });
 
-  // Add the clear history button to the UI
-  chatInterface.appendChild(clearHistoryButton);
+  headerApiKeyButton.addEventListener("click", () => {
+    showApiKeyForm();
+  });
+
+  // Add the button to the header toolbar instead of the header element
+  const headerToolbar = document.querySelector(".header-toolbar");
+  headerToolbar.appendChild(headerApiKeyButton);
+
+  // Create a Clear Chat button in the input area (keep this one only)
+  const clearChatButton = document.createElement("button");
+  clearChatButton.id = "clear-chat-button";
+  clearChatButton.className = "clear-chat-button";
+  clearChatButton.title = "Clear current chat";
+  clearChatButton.style.display = "none"; // Hidden by default
+  clearChatButton.style.alignItems = "center";
+  clearChatButton.style.justifyContent = "center";
+  clearChatButton.style.borderRadius = "50%";
+  clearChatButton.style.width = "36px";
+  clearChatButton.style.height = "36px";
+  clearChatButton.style.border = "none";
+  clearChatButton.style.backgroundColor = "#f0f0f0";
+  clearChatButton.style.cursor = "pointer";
+  clearChatButton.style.transition = "background-color 0.2s ease";
+  clearChatButton.style.marginRight = "8px";
+  clearChatButton.style.flexShrink = "0";
+
+  // Add hover effect
+  clearChatButton.addEventListener("mouseover", () => {
+    clearChatButton.style.backgroundColor = "#e0e0e0";
+  });
+  clearChatButton.addEventListener("mouseout", () => {
+    clearChatButton.style.backgroundColor = "#f0f0f0";
+  });
+
+  // Add trash icon
+  const trashIcon = document.createElement("span");
+  trashIcon.className = "material-icons";
+  trashIcon.style.fontSize = "20px";
+  trashIcon.style.color = "#888";
+  trashIcon.textContent = "delete";
+  clearChatButton.appendChild(trashIcon);
+
+  // Add click event listener
+  clearChatButton.addEventListener("click", () => {
+    clearChatHistory();
+    updateClearChatButtonVisibility();
+  });
+
+  // Insert before the message input in the input container
+  const inputContainer = document.querySelector(".input-container");
+  inputContainer.insertBefore(clearChatButton, messageInput);
+
+  // Call once to set initial state
+  updateClearChatButtonVisibility();
+
+  // Function to update Clear Chat button visibility
+  function updateClearChatButtonVisibility() {
+    const clearChatButton = document.getElementById("clear-chat-button");
+    if (!clearChatButton) return;
+
+    if (chatHistory && chatHistory.length > 0) {
+      clearChatButton.style.display = "flex";
+    } else {
+      clearChatButton.style.display = "none";
+    }
+  }
+
+  // Function to show API key form
+  function showApiKeyForm() {
+    // Get current API key
+    chrome.storage.local.get(["geminiApiKey"], (result) => {
+      if (result.geminiApiKey) {
+        // Populate the input with current key
+        apiKeyInput.value = result.geminiApiKey;
+      }
+
+      // Create a back button for the API key form
+      if (!document.getElementById("back-to-chat")) {
+        const backButton = document.createElement("button");
+        backButton.id = "back-to-chat";
+        backButton.textContent = "Back to Chat";
+        backButton.style.marginTop = "16px";
+        backButton.style.padding = "8px 16px";
+        backButton.style.backgroundColor = "#9e9e9e";
+        backButton.style.color = "white";
+        backButton.style.border = "none";
+        backButton.style.borderRadius = "4px";
+        backButton.style.cursor = "pointer";
+        backButton.style.fontSize = "14px";
+        backButton.style.transition = "background-color 0.2s ease";
+
+        backButton.addEventListener("mouseover", () => {
+          backButton.style.backgroundColor = "#8e8e8e";
+        });
+        backButton.addEventListener("mouseout", () => {
+          backButton.style.backgroundColor = "#9e9e9e";
+        });
+
+        backButton.addEventListener("click", () => {
+          hideApiKeyForm();
+        });
+
+        // Add to API key container
+        apiKeyContainer.appendChild(backButton);
+      }
+
+      // Update title to reflect update action
+      const apiKeyTitle = apiKeyContainer.querySelector("h2");
+      if (apiKeyTitle) {
+        apiKeyTitle.textContent = "Update Your Gemini API Key";
+      }
+
+      // Update button text
+      saveApiKeyButton.textContent = "Update Key";
+      saveApiKeyButton.disabled = false;
+
+      // Show API key container, hide chat interface
+      chatInterface.style.display = "none";
+      apiKeyContainer.style.display = "block";
+      apiKeyContainer.style.opacity = "1";
+      apiKeyContainer.style.transform = "scale(1)";
+
+      // Focus the input
+      apiKeyInput.focus();
+    });
+  }
+
+  // Function to hide API key form and go back to chat
+  function hideApiKeyForm() {
+    apiKeyContainer.style.display = "none";
+    chatInterface.style.display = "flex";
+
+    // Reset form state
+    if (saveApiKeyButton.textContent === "Update Key") {
+      saveApiKeyButton.textContent = "Save";
+    }
+  }
 });

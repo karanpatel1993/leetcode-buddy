@@ -26,16 +26,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // Function to send a message to the Gemini API
 async function sendToGemini(request) {
-  const { apiKey, message, problemContext, userCode } = request;
+  const {
+    apiKey,
+    message,
+    problemContext,
+    userCode,
+    chatHistory = [],
+  } = request;
 
   try {
     // Construct the API URL
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-    // Create the prompt
-    const prompt = constructPrompt(message, problemContext, userCode);
+    // Create the prompt with chat history
+    const prompt = constructPrompt(
+      message,
+      problemContext,
+      userCode,
+      chatHistory
+    );
 
-    console.log("Sending request to Gemini API");
+    console.log(
+      "Sending request to Gemini API with chat history:",
+      chatHistory.length > 0
+    );
 
     // Make the API request
     const response = await fetch(apiUrl, {
@@ -109,27 +123,52 @@ async function sendToGemini(request) {
   }
 }
 
-// Construct a prompt with all the necessary context
-function constructPrompt(message, problemContext, userCode) {
-  return `You are "LeetCode Buddy", an AI assistant specialized in helping users with LeetCode problems.
-You provide help, hints, and feedback on code solutions.
+// Construct a prompt with all the necessary context and chat history
+function constructPrompt(message, problemContext, userCode, chatHistory = []) {
+  let conversationContext = "";
 
-The user is working on the following LeetCode problem:
------
-${problemContext || "(No problem context available)"}
------
+  // Include chat history if available
+  if (chatHistory && chatHistory.length > 0) {
+    conversationContext = "\nPrevious conversation:\n";
 
-The user has written the following code:
-\`\`\`
-${userCode || "(No user code available)"}
-\`\`\`
+    // Only include up to the last 10 messages to avoid very long prompts
+    const recentHistory = chatHistory.slice(-10);
 
-The user asks:
-"${message}"
+    recentHistory.forEach((item) => {
+      if (item.role === "user") {
+        conversationContext += "USER: " + item.content + "\n";
+      } else if (item.role === "assistant") {
+        conversationContext += "ASSISTANT: " + item.content + "\n";
+      }
+    });
 
-Respond in a helpful, educational manner. If they ask for help or hints, avoid giving full solutions right away - instead, guide them step by step. If they follow up specifically asking for code after your explanation, focus on explaining key concepts or small code snippets rather than complete solutions.
+    conversationContext += "\nCurrent message:\n";
+  }
 
-When reviewing code or pointing out issues, focus on explaining the problems and suggesting improvements rather than rewriting the entire solution.
+  const problemContextStr = problemContext || "(No problem context available)";
+  const userCodeStr = userCode || "(No user code available)";
 
-Use markdown formatting for code snippets where appropriate. Keep your responses focused on the LeetCode problem at hand.`;
+  return (
+    'You are "LeetCode Buddy", an AI assistant specialized in helping users with LeetCode problems.\n' +
+    "You provide help, hints, and feedback on code solutions.\n\n" +
+    "The user is working on the following LeetCode problem:\n" +
+    "-----\n" +
+    problemContextStr +
+    "\n" +
+    "-----\n\n" +
+    "The user has written the following code:\n" +
+    "```\n" +
+    userCodeStr +
+    "\n" +
+    "```\n" +
+    conversationContext +
+    "\n" +
+    "The user asks:\n" +
+    '"' +
+    message +
+    '"\n\n' +
+    "Respond in a helpful, educational manner. If they ask for help or hints, avoid giving full solutions right away - instead, guide them step by step. If they follow up specifically asking for code after your explanation, focus on explaining key concepts or small code snippets rather than complete solutions.\n\n" +
+    "When reviewing code or pointing out issues, focus on explaining the problems and suggesting improvements rather than rewriting the entire solution.\n\n" +
+    "Use markdown formatting for code snippets where appropriate. Keep your responses focused on the LeetCode problem at hand."
+  );
 }

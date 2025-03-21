@@ -19,23 +19,85 @@ document.addEventListener("DOMContentLoaded", () => {
   let retryCount = 0;
   const MAX_RETRIES = 3;
 
-  // Keep track of current response message element and streaming state
+  // Keep track of current response element and streaming state
   let currentResponseElement = null;
   let waitingForResponse = false;
   let typingInterval = null;
   let typingCursor = null;
 
+  // Store chat history
+  let chatHistory = [];
+
   // Check if API key is set
-  chrome.storage.local.get(["geminiApiKey"], (result) => {
+  chrome.storage.local.get(["geminiApiKey", "chatHistory"], (result) => {
     if (result.geminiApiKey) {
       apiKeyContainer.style.display = "none";
       chatInterface.style.display = "flex";
+
+      // Load chat history if available
+      if (result.chatHistory && Array.isArray(result.chatHistory)) {
+        chatHistory = result.chatHistory;
+
+        // Render chat history in the UI
+        renderChatHistory();
+      }
+
       checkIfOnLeetCode();
     } else {
       apiKeyContainer.style.display = "block";
       chatInterface.style.display = "none";
     }
   });
+
+  // Render stored chat history
+  function renderChatHistory() {
+    chatHistory.forEach((message) => {
+      if (message.role === "user") {
+        addMessage(message.content, true);
+      } else if (message.role === "assistant") {
+        const messageElement = addMessage("", false);
+        messageElement.innerHTML = formatResponse(message.content);
+      }
+    });
+
+    // Scroll to the latest message
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+  }
+
+  // Format response to properly display markdown and code blocks
+  function formatResponse(text) {
+    if (!text) return "";
+
+    // First extract code blocks to preserve them
+    const codeBlockRegex = /```(?:[\w]*\n)?([\s\S]*?)```/g;
+    let formattedText = text.replace(codeBlockRegex, (match, codeContent) => {
+      // Extract language and code content
+      const langMatch = match.match(/```(\w*)\n?([\s\S]*?)```/);
+      if (!langMatch) return match;
+
+      const language = langMatch[1];
+      const code = langMatch[2];
+
+      // Create HTML for code block
+      return `<div style="position: relative; margin: 10px 0; background-color: #f8fafb; border-radius: 8px; border: 1px solid rgba(0, 0, 0, 0.1); overflow: hidden;">
+        ${
+          language
+            ? `<div style="position: absolute; top: 0; right: 0; font-size: 11px; padding: 3px 8px; color: #888; background-color: rgba(0, 0, 0, 0.05); border-bottom-left-radius: 6px;">${language}</div>`
+            : ""
+        }
+        <pre class="code-block">${code}</pre>
+      </div>`;
+    });
+
+    // Format inline code
+    formattedText = formattedText.replace(/`([^`]+)`/g, "<code>$1</code>");
+
+    // Convert line breaks to HTML
+    formattedText = formattedText.replace(/\n\n/g, "<br><br>");
+    formattedText = formattedText.replace(/\n/g, "<br>");
+
+    return formattedText;
+  }
 
   // Save API key
   saveApiKeyButton.addEventListener("click", () => {
@@ -299,6 +361,15 @@ document.addEventListener("DOMContentLoaded", () => {
         // Create streaming effect on UI before API response
         startTypingAnimation("Thinking...");
 
+        // Add message to chat history before sending
+        chatHistory.push({
+          role: "user",
+          content: message,
+        });
+
+        // Save chat history to storage
+        chrome.storage.local.set({ chatHistory });
+
         // Send request to background script
         chrome.runtime.sendMessage(
           {
@@ -307,6 +378,7 @@ document.addEventListener("DOMContentLoaded", () => {
             message: message,
             problemContext: problemContext,
             userCode: userCode,
+            chatHistory: chatHistory, // Send chat history to background
           },
           (response) => {
             if (chrome.runtime.lastError) {
@@ -318,6 +390,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Initial response from background script
             if (response && response.success) {
+              // Add response to chat history
+              chatHistory.push({
+                role: "assistant",
+                content: response.data,
+              });
+
+              // Save updated chat history to storage
+              chrome.storage.local.set({ chatHistory });
+
               // Start streaming the response
               streamResponse(response.data);
               resolve("Streaming response...");
@@ -739,4 +820,58 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Focus input field on load
   messageInput.focus();
+
+  // Add a new button to clear chat history
+  const clearHistoryButton = document.createElement("button");
+  clearHistoryButton.textContent = "Clear History";
+  clearHistoryButton.className = "clear-history-button";
+  clearHistoryButton.style.marginLeft = "8px";
+  clearHistoryButton.style.padding = "4px 10px";
+  clearHistoryButton.style.backgroundColor = "#ff5252";
+  clearHistoryButton.style.color = "white";
+  clearHistoryButton.style.border = "none";
+  clearHistoryButton.style.borderRadius = "4px";
+  clearHistoryButton.style.cursor = "pointer";
+  clearHistoryButton.style.position = "absolute";
+  clearHistoryButton.style.right = "10px";
+  clearHistoryButton.style.top = "10px";
+
+  clearHistoryButton.addEventListener("click", () => {
+    // Clear chat history
+    chatHistory = [];
+    chrome.storage.local.set({ chatHistory });
+
+    // Clear chat UI
+    chatContainer.innerHTML = "";
+
+    // Add confirmation message
+    const confirmationElement = document.createElement("div");
+    confirmationElement.textContent = "Chat history cleared";
+    confirmationElement.style.textAlign = "center";
+    confirmationElement.style.padding = "10px";
+    confirmationElement.style.color = "#888";
+    confirmationElement.style.fontSize = "12px";
+    confirmationElement.style.opacity = "0";
+    confirmationElement.style.transition = "opacity 0.3s ease";
+
+    chatContainer.appendChild(confirmationElement);
+
+    // Fade in the confirmation message
+    setTimeout(() => {
+      confirmationElement.style.opacity = "1";
+    }, 10);
+
+    // Fade out and remove after 3 seconds
+    setTimeout(() => {
+      confirmationElement.style.opacity = "0";
+      setTimeout(() => {
+        if (confirmationElement.parentNode) {
+          confirmationElement.parentNode.removeChild(confirmationElement);
+        }
+      }, 300);
+    }, 3000);
+  });
+
+  // Add the clear history button to the UI
+  chatInterface.appendChild(clearHistoryButton);
 });
